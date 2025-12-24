@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grand Luxury Tree Final v2</title>
+    <title>🐷 For my Bae 🐷</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Times New Roman', serif; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
@@ -128,7 +128,7 @@
     <div id="canvas-container"></div>
 
     <div id="ui-layer">
-        <h2>Merry Christmas for my Bae, Andy</h2>
+        <h2>Merry Christmas, Andy</h2>
 
         <div class="upload-wrapper">
             <label class="upload-btn">
@@ -177,7 +177,8 @@
             focusIndex: -1,
             focusTarget: null,
             hand: { detected: false, x: 0, y: 0 },
-            rotation: { x: 0, y: 0 }
+            rotation: { x: 0, y: 0 },
+            pinchActive: false
         };
 
         let scene, camera, renderer, composer;
@@ -468,22 +469,23 @@
                  particleSystem.push(new Particle(mesh, 'DUST', true));
             }
         }
-
         function createDefaultPhotos() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#050505'; ctx.fillRect(0,0,512,512);
-            ctx.strokeStyle = '#eebb66'; ctx.lineWidth = 15; ctx.strokeRect(20,20,472,472);
-            ctx.font = '500 60px Times New Roman'; ctx.fillStyle = '#eebb66';
-            ctx.textAlign = 'center';
-            ctx.fillText("Andy", 256, 230);
-            ctx.fillText("Merry Christmas", 256, 250);
+            const loader = new THREE.TextureLoader();
 
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.colorSpace = THREE.SRGBColorSpace;
-            addPhotoToScene(tex);
+            loader.load(
+                'images/avatar.jpg',   // đường dẫn ảnh
+                (texture) => {
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                    addPhotoToScene(texture);
+                },
+                undefined,
+                (err) => {
+                    console.error('Failed to load default avatar image', err);
+                }
+            );
         }
+
 
         function addPhotoToScene(texture) {
             const frameGeo = new THREE.BoxGeometry(1.4, 1.4, 0.05);
@@ -560,36 +562,67 @@
         }
 
         function processGestures(result) {
-            if (result.landmarks && result.landmarks.length > 0) {
-                STATE.hand.detected = true;
-                const lm = result.landmarks[0];
-                STATE.hand.x = (lm[9].x - 0.5) * 2;
-                STATE.hand.y = (lm[9].y - 0.5) * 2;
-
-                const thumb = lm[4]; const index = lm[8]; const wrist = lm[0];
-                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-                const tips = [lm[8], lm[12], lm[16], lm[20]];
-                let avgDist = 0;
-                tips.forEach(t => avgDist += Math.hypot(t.x - wrist.x, t.y - wrist.y));
-                avgDist /= 4;
-
-                if (pinchDist < 0.05) {
-                    if (STATE.mode !== 'FOCUS') {
-                        STATE.mode = 'FOCUS';
-                        const photos = particleSystem.filter(p => p.type === 'PHOTO');
-                        if (photos.length) STATE.focusTarget = photos[Math.floor(Math.random()*photos.length)].mesh;
-                    }
-                } else if (avgDist < 0.25) {
-                    STATE.mode = 'TREE';
-                    STATE.focusTarget = null;
-                } else if (avgDist > 0.4) {
-                    STATE.mode = 'SCATTER';
-                    STATE.focusTarget = null;
-                }
-            } else {
+            if (!result.landmarks || result.landmarks.length === 0) {
                 STATE.hand.detected = false;
+                STATE.pinchActive = false;
+                console.log('FOCUS:', STATE.focusTarget?.id);
+                return;
+            }
+
+            STATE.hand.detected = true;
+            const lm = result.landmarks[0];
+
+            STATE.hand.x = (lm[9].x - 0.5) * 2;
+            STATE.hand.y = (lm[9].y - 0.5) * 2;
+
+            const thumb = lm[4];
+            const index = lm[8];
+            const wrist = lm[0];
+
+            const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+
+            const tips = [lm[8], lm[12], lm[16], lm[20]];
+            let avgDist = 0;
+            tips.forEach(t => avgDist += Math.hypot(t.x - wrist.x, t.y - wrist.y));
+            avgDist /= tips.length;
+
+            /* =========================
+               PINCH → FOCUS (highest priority)
+               ========================= */
+            if (pinchDist < 0.07) {
+                if (!STATE.pinchActive) {
+                    STATE.pinchActive = true;
+                    STATE.mode = 'FOCUS';
+
+                    const photos = particleSystem.filter(p => p.type === 'PHOTO');
+                    if (photos.length) {
+                        STATE.focusTarget =
+                            photos[Math.floor(Math.random() * photos.length)].mesh;
+                    }
+                }
+                return;
+            }
+
+            STATE.pinchActive = false;
+
+            /* =========================
+               CLOSED FIST → TREE
+               ========================= */
+            if (avgDist < 0.28) {
+                STATE.mode = 'TREE';
+                STATE.focusTarget = null;
+                return;
+            }
+
+            /* =========================
+               OPEN PALM → SCATTER
+               ========================= */
+            if (avgDist > 0.45) {
+                STATE.mode = 'SCATTER';
+                STATE.focusTarget = null;
             }
         }
+
 
         function setupEvents() {
             window.addEventListener('resize', () => {
