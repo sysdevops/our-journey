@@ -71,3 +71,31 @@ document.addEventListener("DOMContentLoaded", () => {
         sections.forEach(el => observer.observe(el));
     }
 });
+let isMusicPlaying = false;
+const audio = document.getElementById('local-audio');
+const musicBtn = document.getElementById('music-btn');
+const iconBox = document.getElementById('music-icon-container');
+
+function toggleLocalMusic() {
+    if (isMusicPlaying) {
+        audio.pause();
+        musicBtn.classList.remove('bg-primary', 'text-white');
+        musicBtn.classList.add('bg-white', 'text-primary');
+        iconBox.innerHTML = '<span class="material-symbols-outlined text-2xl">music_note</span>';
+        iconBox.classList.remove('animate-spin');
+    } else {
+        audio.play().catch(err => {
+            console.info("Trình duyệt chặn tự động phát. Hãy tương tác với trang trước! ❤️");
+        });
+        musicBtn.classList.remove('bg-white', 'text-primary');
+        musicBtn.classList.add('bg-primary', 'text-white');
+        iconBox.innerHTML = '<span class="material-symbols-outlined text-2xl">album</span>';
+        iconBox.classList.add('animate-spin');
+        iconBox.style.animationDuration = '3s';
+    }
+    isMusicPlaying = !isMusicPlaying;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    if(audio) audio.volume = 0.4;
+});
